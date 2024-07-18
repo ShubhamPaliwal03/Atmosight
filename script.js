@@ -3,6 +3,38 @@ const searchbar = document.querySelector(".searchbar");
 const weather_condition_icon = document.querySelector(".weather-condition-icon");
 const locate_btn = document.querySelector('.locate-btn');
 
+const loadLastAccessedLocationData = async () => {
+
+    let lastAccessedWeatherDataObject = null;
+
+    if(localStorage.getItem("lastAccessedWeatherDataObject") === null) {
+    
+        lastAccessedWeatherDataObject = await updateWeatherDataUsingCurrentLocation();
+    
+        if (lastAccessedWeatherDataObject !== null) {
+    
+            localStorage.setItem("lastAccessedWeatherDataObject", JSON.stringify(lastAccessedWeatherDataObject));
+    
+        } else {
+        
+            lastAccessedWeatherDataObject = await getWeatherData("New Delhi", false);
+    
+            if (weatherDataObject !== null) {
+                
+                updateDataInDOM(lastAccessedWeatherDataObject);
+    
+                localStorage.setItem("lastAccessedWeatherDataObject", JSON.stringify(lastAccessedWeatherDataObject));
+            }
+        }
+    
+    } else {
+    
+        lastAccessedWeatherDataObject = JSON.parse(localStorage.getItem("lastAccessedWeatherDataObject"));
+
+        updateDataInDOM(lastAccessedWeatherDataObject);
+    }
+};
+
 searchbar.addEventListener('focus', () => {
 
     const curr_width = searchbar.clientWidth / 16;
@@ -24,7 +56,7 @@ const getJSONData = async (response) => {
     return JSONData;
 };
 
-const getWeatherData = async (search_location) => {
+const getWeatherData = async (search_location, isLocationManuallySent) => {
     
     const api_request = `https://api.weatherapi.com/v1/current.json?key=6af41b5946e14ac6a3a174318241407&q=${search_location}&aqi=yes`;
     
@@ -34,18 +66,27 @@ const getWeatherData = async (search_location) => {
 
     if (response.status === 200) {
 
-        const weatherJSONData = await getJSONData(response);
+        const weatherDataObject = await getJSONData(response);
 
-        console.log(weatherJSONData);
+        localStorage.setItem("lastAccessedWeatherDataObject", JSON.stringify(weatherDataObject));
 
-        return weatherJSONData;
-    } 
+        console.log(weatherDataObject);
+
+        return weatherDataObject;
+    }
 
     // if response code is 400 (Bad Request)
 
     else if (response.status === 400) {
 
-        alert("Location not found! Please enter a valid location!");
+        if (isLocationManuallySent) {
+
+            alert("Location not found! Please enter a valid location!");
+
+        } else {
+
+            alert("We are having trouble finding your location automatically :(\nPlease try searching it manually!");
+        }
 
     } else {
 
@@ -314,13 +355,9 @@ const getWeatherIconPath = (weatherCondition, isDay, temperature) => {
     return folder_path + icon_name;
 };
 
-const updateWeatherData = async (search_location) => {
+const updateDataInDOM = (weatherDataObject) => {
 
-    const weatherDataObject = await getWeatherData(search_location);
-
-    if (weatherDataObject !== null) {
-
-        // get all the elements to be updated
+    // get all the elements to be updated
 
         const weather_condition_icon = document.querySelector('.weather-condition-icon');
         const temperature_value = document.querySelector('.temperature-value');
@@ -358,10 +395,21 @@ const updateWeatherData = async (search_location) => {
         wind_speed_value.innerText = weatherDataObject.current.wind_kph;
 
         wind_dir_compass_arrow.style.transform = `rotate(${weatherDataObject.current.wind_degree}deg)`;
-    }
 };
 
-const processInput = async () => {
+const updateWeatherData = async (search_location, isLocationManuallySent) => {
+
+    const weatherDataObject = await getWeatherData(search_location, isLocationManuallySent);
+
+    if (weatherDataObject !== null) {
+
+        updateDataInDOM(weatherDataObject);
+    }
+
+    return weatherDataObject;
+};
+
+const processUserInput = async () => {
 
     const search_location = searchbar.value;
 
@@ -369,21 +417,41 @@ const processInput = async () => {
 
     if (search_location !== "") {
 
-        await updateWeatherData(search_location);
+        await updateWeatherData(search_location, true);
 
         searchbar.value = "";
     }    
 }
 
-search_btn.addEventListener('click', processInput);
+search_btn.addEventListener('click', processUserInput);
 
 document.addEventListener("keyup", (event) => {
 
     if (event.key === "Enter") {
 
-        processInput();
+        processUserInput();
     }
 });
+
+// @return {string} : returns the current permission status of the location
+//
+// i.   granted: The user has granted permission to access location information.
+// ii.  denied: The user has denied permission to access location information.
+// iii. prompt: The browser is currently prompting the user for permission.
+
+// const checkLocationPermission = async () => {
+
+//     try {
+
+//         const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+//         return permissionStatus.state;
+
+//     } catch (error) {
+
+//         console.log(error);
+//         return 'error';
+//     }
+// };
 
 // @param {void}
 // @return {object} : returns the current location coordinates of the user (if supported by the device)
@@ -400,6 +468,29 @@ const fetchCurrentLocationCoords = () => {
             
             }, (error) => {
             
+                switch(error.code) {
+
+                    case error.PERMISSION_DENIED:
+
+                        alert("You have denied the request to provide access to location services!\n\nPlease enable them in the permissions option near the search bar or in your browser settings!");
+                        break;
+
+                    case error.TIMEOUT:
+                            
+                        alert("The request to access your location information has timed out!");
+                        break;
+
+                    case  error.POSITION_UNAVAILABLE:
+
+                        alert("Your location information is currently unavailable!\nNo worries! You can still search manually :)");
+                        break;
+
+                    default:
+                        
+                        alert("An unknown error occurred while trying to access your location information!\nNo worries! You can try again or search manually :)");
+                        break;
+                }
+
                 console.log(error);
             
                 reject(null);
@@ -416,30 +507,56 @@ const updateWeatherDataUsingCurrentLocation = async () => {
 
     locate_btn.removeEventListener('click', updateWeatherDataUsingCurrentLocation);
     locate_btn.classList.add('disabled');
-    console.log("locate button is disabled");
+    // console.log("locate button is disabled");
 
-    const coords = await fetchCurrentLocationCoords();
+    try {
+        
+        const coords = await fetchCurrentLocationCoords();
+    
+        console.log(coords);
+    
+        if(coords !== null) {
+    
+            const latitude = coords.latitude;
+            const longitude = coords.longitude;
+    
+            const weatherDataObject = await updateWeatherData(`${latitude}, ${longitude}`, false);
 
-    console.log(coords);
+            return weatherDataObject;
+    
+        } else {
+    
+            alert("Geolocation is not supported by your device :(\nNo worries! You can still search manually :)");
 
-    if(coords !== null) {
+            return null;
+        }
 
-        const latitude = coords.latitude;
-        const longitude = coords.longitude;
+    } catch (error) {
 
-        await updateWeatherData(`${latitude}, ${longitude}`);
+        console.error("An error occurred while trying to fetch the current location coordinates!");
 
-    } else {
-
-        alert("Geolocation is not supported by your device :(\nNo worries! You can still search manually :)");
+        return null;
     }
 
-    locate_btn.addEventListener('click', updateWeatherDataUsingCurrentLocation);
-    locate_btn.classList.remove('disabled');
-    console.log("locate button is enabled back again");
+    finally {
+
+        locate_btn.addEventListener('click', updateWeatherDataUsingCurrentLocation);
+        locate_btn.classList.remove('disabled');
+    }
+
+    // console.log("locate button is enabled back again");
 }
 
 locate_btn.addEventListener('click', updateWeatherDataUsingCurrentLocation);
+
+// we will have to use an IIFE, or a function (simple / arrow) and call it below
+// because await can only be used inside an async function or at the top level of a module.
+
+(async () => {
+
+    await loadLastAccessedLocationData()
+
+})();
 
 // const api_request = "http://api.weatherapi.com/v1/current.json?key=6af41b5946e14ac6a3a174318241407&q=Bikaner&aqi=yes";
 
