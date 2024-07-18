@@ -55,9 +55,11 @@ const getWeatherData = async (search_location) => {
     return null;
 };
 
-const getWeatherIconPath = (weatherCondition) => {
+const getWeatherIconPath = (weatherCondition, isDay, temperature) => {
 
-    weather_condition_icon.classList.remove("sunny", "clear"); // remove the sunny and clear class (if exists any)
+    // remove the sunny, clear, and moon class of old icon (if exists any)
+
+    weather_condition_icon.classList.remove("sunny", "clear", "moon");
 
     weatherCondition = weatherCondition.toLowerCase();
 
@@ -68,25 +70,39 @@ const getWeatherIconPath = (weatherCondition) => {
 
         case weatherCondition === "sunny":
 
-            icon_name = "clear_day.svg";
-            weather_condition_icon.classList.add("sunny");
+            if (temperature >= 45) {
+
+                icon_name = "very_hot.png";
+
+            } else {
+
+                icon_name = "clear_day.svg";
+                weather_condition_icon.classList.add("sunny");
+            }
 
             break;
 
         case weatherCondition === "clear":
 
             icon_name = "clear_night.svg";
-            weather_condition_icon.classList.add("clear");
+            weather_condition_icon.classList.add("clear", "moon");
 
             break;
     
         case weatherCondition === "partly cloudy":
 
-            icon_name = "partly_cloudy_day.svg";
+            if (isDay) {
+
+                icon_name = "partly_cloudy_day.svg";
+            }
+
+            else {
+                
+                icon_name = "partly_cloudy_night.svg";
+                weather_condition_icon.classList.add("moon");
+            }
 
             break;
-
-        // cloudy night
 
         case weatherCondition === "cloudy":
 
@@ -96,11 +112,18 @@ const getWeatherIconPath = (weatherCondition) => {
 
         case weatherCondition === "overcast":
 
-            icon_name = "mostly_cloudy_day.svg";
+            if (isDay) {
+
+                icon_name = "mostly_cloudy_day.svg";
+            }
+
+            else {
+                
+                icon_name = "mostly_cloudy_night_.svg";
+                weather_condition_icon.classList.add("moon");
+            }
             
             break;
-
-        // overcast night
     
         case weatherCondition === "mist":
         case weatherCondition === "fog":
@@ -133,7 +156,7 @@ const getWeatherIconPath = (weatherCondition) => {
 
         case weatherCondition === "light rain shower":
 
-            icon_name = "scattered_showers_day.svg";
+            icon_name = isDay ? "scattered_showers_day.svg" : "scattered_showers_night.svg";
 
             break;
     
@@ -166,7 +189,7 @@ const getWeatherIconPath = (weatherCondition) => {
 
         case weatherCondition === "patchy light rain with thunder":
 
-            icon_name = "isolated_scattered_thunderstorms_day.svg";
+            icon_name = isDay ? "isolated_scattered_thunderstorms_day.svg" : "isolated_scattered_thunderstorms_night.svg";
 
             break;
 
@@ -206,13 +229,29 @@ const getWeatherIconPath = (weatherCondition) => {
         case weatherCondition === "patchy heavy snow":
         case weatherCondition === "heavy snow":
 
-            icon_name = "heavy_snow.svg";
+            if (temperature <= -30) {
+
+                icon_name = "very_cold.svg";
+
+            } else {
+
+                icon_name = "heavy_snow.svg";
+            }
             
             break;
 
         case weatherCondition === "light snow showers":
-            
-            icon_name = "scattered_snow_showers_day.svg";
+
+            if (isDay) {
+
+                icon_name = "scattered_snow_showers_day.svg";
+            }
+
+            else {
+                
+                icon_name = "scattered_snow_showers_night.svg";
+                weather_condition_icon.classList.add("moon");
+            }
 
             break;
       
@@ -259,13 +298,12 @@ const getWeatherIconPath = (weatherCondition) => {
 
         /*
             cloudy with sunny
-            cloudy_with_snow 
+            cloudy with snow 
             sunny with snow
             sunny and cloudy
             sunny with cloudy
             sunny with rain
             mostly clear day / night
-            mostly cloudy day / night
             tropical storm hurricane
             tornado
             very hot
@@ -298,12 +336,15 @@ const updateWeatherData = async (search_location) => {
 
         const weatherConditon = weatherDataObject.current.condition.text;
         weather_description.innerText = weatherConditon;
+
+        const isDay = weatherDataObject.current.is_day === 1 ? true : false;
         
-        const weatherIconPath = getWeatherIconPath(weatherConditon);
+        const temperature = weatherDataObject.current.temp_c;
+        temperature_value.innerText = temperature;
+
+        const weatherIconPath = getWeatherIconPath(weatherConditon, isDay, temperature);
 
         weather_condition_icon.src = weatherIconPath !== "./images/weather-icons/unknown" ? weatherIconPath : weatherDataObject.current.condition.icon;
-
-        temperature_value.innerText = weatherDataObject.current.temp_c;
 
         feels_like_temperature_value.innerText = weatherDataObject.current.feelslike_c;
 

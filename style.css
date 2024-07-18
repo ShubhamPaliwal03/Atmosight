@@ -46,8 +46,11 @@ body
 }
 .weather-condition-icon.clear
 {
-    filter: hue-rotate(170deg) saturate(130%) brightness(115%);
     animation: swing 3s infinite linear alternate;
+}
+.moon
+{
+    filter: hue-rotate(170deg) saturate(130%) brightness(115%);
 }
 .humidity-icon, .wind-icon
 {
